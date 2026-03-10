@@ -1,19 +1,31 @@
 # DGX Spark AI Stack
 
-NVIDIA DGX Spark üzerinde yapay zeka ve makine öğrenmesi iş yüklerini çalıştırmak için hazırlanmış uçtan uca AI altyapı yığını.
+NVIDIA DGX Spark üzerinde **Open WebUI + LiteLLM + vLLM** ile lokal AI chatbot stack'i. Docker Compose ile tek komutla kurulum.
 
-## Genel Bakış
+## Mimari
 
-Bu proje, NVIDIA DGX Spark platformu üzerinde AI/ML geliştirme ortamının kurulumu, yapılandırılması ve yönetimi için gerekli araçları ve yapılandırmaları içerir.
+```
+┌─────────────────────────────────────────────┐
+│               Open WebUI (:3000)            │
+│            (Chat Arayüzü / RAG)             │
+├─────────────────────────────────────────────┤
+│              LiteLLM (:4000)                │
+│        (API Gateway / Model Router)         │
+├─────────────────────────────────────────────┤
+│               vLLM (:8000)                  │
+│          (GPU Model Inference)              │
+├─────────────────────────────────────────────┤
+│          NVIDIA DGX Spark GPU               │
+└─────────────────────────────────────────────┘
+```
 
-## Özellikler
+## Bileşenler
 
-- NVIDIA GPU sürücüleri ve CUDA toolkit yapılandırması
-- Konteyner tabanlı AI/ML ortamları (Docker & NVIDIA Container Toolkit)
-- Jupyter Lab / Notebook entegrasyonu
-- Popüler ML framework desteği (PyTorch, TensorFlow, vb.)
-- Model eğitim ve çıkarım (inference) pipeline'ları
-- Monitoring ve kaynak yönetimi araçları
+| Bileşen | Açıklama | Port |
+|---------|----------|------|
+| **Open WebUI** | ChatGPT benzeri web arayüzü, RAG desteği | `:3000` |
+| **LiteLLM** | Birden fazla model için API gateway ve yönlendirici | `:4000` |
+| **vLLM** | GPU hızlandırmalı yüksek performanslı LLM inference engine | `:8000` |
 
 ## Gereksinimler
 
@@ -22,14 +34,21 @@ Bu proje, NVIDIA DGX Spark platformu üzerinde AI/ML geliştirme ortamının kur
 - NVIDIA Driver 535+
 - Docker & NVIDIA Container Toolkit
 
-## Kurulum
+## Hızlı Kurulum
 
 ```bash
 git clone https://github.com/acarmehmet15/dgx-spark-ai-stack.git
 cd dgx-spark-ai-stack
+docker compose up -d
 ```
 
-Detaylı kurulum talimatları yakında eklenecektir.
+## Kullanım
+
+Kurulum tamamlandıktan sonra:
+
+- **Chat Arayüzü:** http://localhost:3000
+- **LiteLLM API:** http://localhost:4000
+- **vLLM API:** http://localhost:8000
 
 ## Lisans
 
