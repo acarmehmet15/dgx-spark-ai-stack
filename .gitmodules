@@ -1,0 +1,3 @@
+[submodule "sdlc-agents"]
+	path = sdlc-agents
+	url = https://github.com/acarmehmet15/SDLCAgents.git

@@ -1,0 +1,82 @@
+model_list:
+  # ─── Lokal LLM Modelleri (Ollama) ───
+  - model_name: deepseek-r1:70b
+    litellm_params:
+      model: ollama/deepseek-r1:70b
+      api_base: http://host.docker.internal:11434
+
+  - model_name: gpt-oss:120b
+    litellm_params:
+      model: ollama/gpt-oss:120b
+      api_base: http://host.docker.internal:11434
+
+  - model_name: qwen2.5-coder:32b-instruct-q8_0
+    litellm_params:
+      model: ollama/qwen2.5-coder:32b-instruct-q8_0
+      api_base: http://host.docker.internal:11434
+
+  - model_name: qwen2.5-coder:32b
+    litellm_params:
+      model: ollama/qwen2.5-coder:32b
+      api_base: http://host.docker.internal:11434
+
+  - model_name: gpt-oss:20b
+    litellm_params:
+      model: ollama/gpt-oss:20b
+      api_base: http://host.docker.internal:11434
+
+  # ─── SDLC Agent'ları (Agno → Agent Bridge) ───
+  - model_name: sdlc-analyst
+    litellm_params:
+      model: openai/sdlc-analyst
+      api_base: http://agent-bridge:8506/v1
+      api_key: "not-needed"
+
+  - model_name: sdlc-architect
+    litellm_params:
+      model: openai/sdlc-architect
+      api_base: http://agent-bridge:8506/v1
+      api_key: "not-needed"
+
+  - model_name: sdlc-be-developer
+    litellm_params:
+      model: openai/sdlc-be-developer
+      api_base: http://agent-bridge:8506/v1
+      api_key: "not-needed"
+
+  - model_name: sdlc-fe-developer
+    litellm_params:
+      model: openai/sdlc-fe-developer
+      api_base: http://agent-bridge:8506/v1
+      api_key: "not-needed"
+
+  - model_name: sdlc-reviewer
+    litellm_params:
+      model: openai/sdlc-reviewer
+      api_base: http://agent-bridge:8506/v1
+      api_key: "not-needed"
+
+  - model_name: sdlc-qa
+    litellm_params:
+      model: openai/sdlc-qa
+      api_base: http://agent-bridge:8506/v1
+      api_key: "not-needed"
+
+  - model_name: sdlc-supervisor
+    litellm_params:
+      model: openai/sdlc-supervisor
+      api_base: http://agent-bridge:8506/v1
+      api_key: "not-needed"
+
+guardrails:
+  - guardrail_name: kvkk-pii
+    litellm_params:
+      guardrail: guardrails.kvkk_guardrail.KVKKGuardrail
+      mode: pre_call
+      default_on: true
+
+  - guardrail_name: kvkk-pii-output
+    litellm_params:
+      guardrail: guardrails.kvkk_guardrail.KVKKGuardrail
+      mode: post_call
+      default_on: true

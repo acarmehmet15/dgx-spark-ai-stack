@@ -1,0 +1,232 @@
+services:
+  # ─── Open WebUI: Ana chat arayüzü ───
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:main
+    container_name: open-webui
+    restart: unless-stopped
+    environment:
+      - OPENAI_API_BASE_URL=http://litellm:4000/v1
+      - OPENAI_API_KEY=${LITELLM_MASTER_KEY:-sk-litellm-master-key}
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY:-your-webui-secret-key}
+      - ENABLE_OLLAMA_API=false
+    volumes:
+      - open-webui-data:/app/backend/data
+    ports:
+      - "3000:8080"
+    depends_on:
+      litellm:
+        condition: service_healthy
+    networks:
+      - ai-stack
+
+  # ─── LiteLLM: API Gateway + KVKK Guardrail ───
+  litellm:
+    image: ghcr.io/berriai/litellm:main-latest
+    container_name: litellm
+    restart: unless-stopped
+    environment:
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY:-sk-litellm-master-key}
+    volumes:
+      - ./litellm-config.yaml:/app/config.yaml
+      - ./guardrails:/app/guardrails
+    ports:
+      - "4000:4000"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command:
+      - --config=/app/config.yaml
+      - --host=0.0.0.0
+      - --port=4000
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks:
+      - ai-stack
+
+  # ─── Agent Bridge: Agno → OpenAI-uyumlu API köprüsü ───
+  agent-bridge:
+    build:
+      context: ./services/agent-bridge
+      dockerfile: Dockerfile
+    container_name: agent-bridge
+    restart: unless-stopped
+    ports:
+      - "8506:8506"
+    depends_on:
+      agentos-api:
+        condition: service_healthy
+    networks:
+      - ai-stack
+
+  # ─── AgentOS API: SDLC Agent backend ───
+  agentos-api:
+    build:
+      context: ./sdlc-agents
+      dockerfile: Dockerfile
+    container_name: agentos-api
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      RUNTIME_ENV: ${RUNTIME_ENV:-dev}
+      GITHUB_ACCESS_TOKEN: ${GITHUB_TOKEN}
+      ADO_MCP_AUTH_TOKEN: ${ADO_MCP_AUTH_TOKEN:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_DATABASE: ${POSTGRES_DB:-sdlc_agents}
+      DB_USER: ${POSTGRES_USER:-sdlc}
+      DB_PASS: ${POSTGRES_PASSWORD:-sdlc_secret}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      AGNO_MONITOR: "true"
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://otel-collector:4318
+      OTEL_SERVICE_NAME: sdlc-agents
+    ports:
+      - "7777:7777"
+    volumes:
+      - ./sdlc-agents/src:/app/src
+      - ./config/agents.yaml:/app/config/agents.yaml:ro
+      - ./config/registry_patch.py:/app/config/registry_patch.py:ro
+      - ./config/entrypoint.py:/app/config/entrypoint.py:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    command: ["python", "config/entrypoint.py"]
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:7777/health')\""]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - ai-stack
+
+  # ─── CLIProxyAPI: Claude Max → OpenAI-uyumlu proxy (isteğe bağlı) ───
+  # Başlatmak için: docker compose --profile cliproxy up -d cliproxy
+  cliproxy:
+    image: eceasy/cli-proxy-api:latest
+    container_name: cliproxy
+    restart: unless-stopped
+    profiles:
+      - cliproxy
+    volumes:
+      - ./sdlc-agents/config/cliproxy.yaml:/CLIProxyAPI/config.yaml:ro
+      - cliproxy-auth:/auth
+    ports:
+      - "8317:8317"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8317/v1/models || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - ai-stack
+
+  # ─── PostgreSQL + pgvector ───
+  postgres:
+    image: agnohq/pgvector:18
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sdlc_agents}
+      POSTGRES_USER: ${POSTGRES_USER:-sdlc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sdlc_secret}
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-sdlc}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ai-stack
+
+  # ─── Redis ───
+  redis:
+    image: redis:7-alpine
+    container_name: redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - ai-stack
+
+  # ─── OpenTelemetry Collector ───
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.96.0
+    container_name: otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otelcol/config.yaml"]
+    volumes:
+      - ./sdlc-agents/config/otel-collector.yaml:/etc/otelcol/config.yaml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    networks:
+      - ai-stack
+
+  # ─── Prometheus ───
+  prometheus:
+    image: prom/prometheus:v2.51.0
+    container_name: prometheus
+    restart: unless-stopped
+    volumes:
+      - ./sdlc-agents/config/prometheus.yaml:/etc/prometheus/prometheus.yml:ro
+      - prometheusdata:/prometheus
+    ports:
+      - "9090:9090"
+    depends_on:
+      - otel-collector
+    networks:
+      - ai-stack
+
+  # ─── Grafana ───
+  grafana:
+    image: grafana/grafana:11.0.0
+    container_name: grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - grafanadata:/var/lib/grafana
+      - ./sdlc-agents/config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./sdlc-agents/config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    ports:
+      - "3001:3000"
+    depends_on:
+      - prometheus
+    networks:
+      - ai-stack
+
+volumes:
+  open-webui-data:
+  pgdata:
+  redisdata:
+  prometheusdata:
+  grafanadata:
+  cliproxy-auth:
+
+networks:
+  ai-stack:
+    driver: bridge

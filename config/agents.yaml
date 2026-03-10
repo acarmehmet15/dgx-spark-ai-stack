@@ -1,0 +1,74 @@
+# ─── Agent Yapılandırması (DGX Spark — Lokal Ollama) ───
+# CLIProxy yerine Ollama üzerindeki lokal modelleri kullanır.
+# Sağlayıcılar: anthropic | openai | google | cliproxy | ollama
+
+defaults:
+  model_provider: ollama
+  model_id: qwen2.5-coder:32b-instruct-q8_0
+  show_tool_calls: true
+  markdown: true
+  timeout_seconds: 600
+  retries: 3
+  delay_between_retries: 5
+  exponential_backoff: true
+
+agents:
+  analyst:
+    model_provider: ollama
+    model_id: qwen2.5-coder:32b-instruct-q8_0
+    description: "Belgeleri okur, gereksinimleri çıkarır, GitHub Issue oluşturur, kabul kriterlerini yazar"
+    timeout_seconds: 600
+    retries: 3
+    fallback_models:
+      - provider: ollama
+        model_id: qwen2.5-coder:32b-instruct-q8_0
+
+  architect:
+    model_provider: ollama
+    model_id: qwen2.5-coder:32b-instruct-q8_0
+    description: "Mimari kararlar alır, ADR'ler yazar"
+    timeout_seconds: 600
+    retries: 3
+    fallback_models:
+      - provider: ollama
+        model_id: qwen2.5-coder:32b-instruct-q8_0
+
+  be_developer:
+    model_provider: ollama
+    model_id: qwen2.5-coder:32b-instruct-q8_0
+    description: "Backend (.NET) kodu yazar, birim testleri oluşturur, dal açar, PR oluşturur"
+    timeout_seconds: 900
+    retries: 3
+    fallback_models:
+      - provider: ollama
+        model_id: qwen2.5-coder:32b-instruct-q8_0
+
+  fe_developer:
+    model_provider: ollama
+    model_id: qwen2.5-coder:32b-instruct-q8_0
+    description: "Frontend (React/TypeScript) kodu yazar, component testleri oluşturur"
+    timeout_seconds: 600
+    retries: 3
+    fallback_models:
+      - provider: ollama
+        model_id: qwen2.5-coder:32b-instruct-q8_0
+
+  reviewer:
+    model_provider: ollama
+    model_id: qwen2.5-coder:32b-instruct-q8_0
+    description: "PR değişikliklerini inceler, güvenlik/kalite kontrolleri yapar, onaylar veya reddeder"
+    timeout_seconds: 600
+    retries: 3
+    fallback_models:
+      - provider: ollama
+        model_id: qwen2.5-coder:32b-instruct-q8_0
+
+  qa:
+    model_provider: ollama
+    model_id: qwen2.5-coder:32b-instruct-q8_0
+    description: "Test planları oluşturur, kapsamı doğrular, son onayı verir"
+    timeout_seconds: 600
+    retries: 3
+    fallback_models:
+      - provider: ollama
+        model_id: qwen2.5-coder:32b-instruct-q8_0
